@@ -1,0 +1,526 @@
+---
+title: "Predicting Median Home Values"
+author: "Jonathan Monteiro"
+date: "12/09/2019"
+output:
+  ioslides_presentation: 
+     logo: cartoonlogo.png
+  html_document: default
+  code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE)
+```
+
+```{r}
+
+#Created algorithms to collect every city name from each selected state from AreaVibes.com
+
+city.page <- readLines('https://www.areavibes.com/ma/',warn=FALSE)
+
+#Found a unique identifier for each line containing a city name and then reduced the line to just the city name
+
+all.ma.cities <- grep('href=',city.page, value=TRUE) 
+all.ma.cities <- unlist(strsplit(all.ma.cities[23],split="href"))
+all.ma.cities <- unlist(strsplit(all.ma.cities[2:247],split="/"))
+all.ma.cities <- all.ma.cities[seq(from = 2, to = length(all.ma.cities),by = 5)]
+
+#The above step was completed for 5 states in total
+
+city.page <- readLines('https://www.areavibes.com/wv/',warn=FALSE)
+all.wv.cities <- grep('href=',city.page, value=TRUE)
+all.wv.cities <- unlist(strsplit(all.wv.cities[23],split="href"))
+all.wv.cities <- unlist(strsplit(all.wv.cities[2:length(all.wv.cities)],split="/"))
+all.wv.cities <- all.wv.cities[seq(from = 2, to = length(all.wv.cities),by = 5)]
+
+city.page <- readLines('https://www.areavibes.com/al/',warn=FALSE)
+all.al.cities <- grep('href=',city.page, value=TRUE)
+all.al.cities <- unlist(strsplit(all.al.cities[23],split="href"))
+all.al.cities <- unlist(strsplit(all.al.cities[2:length(all.al.cities)],split="/"))
+all.al.cities <- all.al.cities[seq(from = 2, to = length(all.al.cities),by = 5)]
+
+city.page <- readLines('https://www.areavibes.com/md/',warn=FALSE)
+all.md.cities <- grep('href=',city.page, value=TRUE)
+all.md.cities <- unlist(strsplit(all.md.cities[23],split="href"))
+all.md.cities <- unlist(strsplit(all.md.cities[2:length(all.md.cities)],split="/"))
+all.md.cities <- all.md.cities[seq(from = 2, to = length(all.md.cities),by = 5)]
+
+city.page <- readLines('https://www.areavibes.com/nh/',warn=FALSE)
+all.nh.cities <- grep('href=',city.page, value=TRUE)
+all.nh.cities <- unlist(strsplit(all.nh.cities[23],split="href"))
+all.nh.cities <- unlist(strsplit(all.nh.cities[2:length(all.nh.cities)],split="/"))
+all.nh.cities <- all.nh.cities[seq(from = 2, to = length(all.nh.cities),by = 5)]
+```
+
+```{r}
+
+#Created a function to scrape data from each individual city page from the selected states above
+
+city.data <- function(city.page) {
+
+#Data was dispersed throughout several pages based on the type of information so each page was considered  
+  
+address <- paste("https://www.areavibes.com/", city.page,"/livability",sep = "")
+city.data <- readLines(address,warn=FALSE)  
+  
+crime.address <- paste("https://www.areavibes.com/", city.page,"/crime",sep = "")
+crime.data <- readLines(crime.address,warn=FALSE)
+    
+demo.address <- paste("https://www.areavibes.com/", city.page,"/demographics",sep = "")
+demo.data <- readLines(demo.address,warn=FALSE)  
+
+job.address <- paste("https://www.areavibes.com/", city.page,"/employment",sep = "")
+job.data <- readLines(job.address,warn=FALSE)
+
+#Various points of data was then collected for each city
+
+City.Name <- grep("            <h2>",city.data,value=TRUE)
+City.Name <- as.character(gsub("            <h2>|</h2>","",City.Name))
+
+Population.Density <-  grep("\t\t\t\t\t\t<tr><td>Population density",demo.data,value=TRUE)
+Population.Density <- unlist(strsplit(Population.Density, split="<td>"))
+Population.Density <- as.numeric(gsub("</td>|,","",Population.Density[3]))
+Population.Density
+
+Median.Age <-  grep("\t\t\t\t\t\t<tr><td>Median age</td><td>",demo.data,value=TRUE)
+Median.Age <- unlist(strsplit(Median.Age,split="<td>"))
+Median.Age <- as.numeric(gsub("</td>","",Median.Age[3]))
+
+Grad.Rates <- grep("            <div class=\"facts-box-body\"><em>",city.data,value=TRUE)
+Grad.Rates <- unlist(strsplit(Grad.Rates[11],split=">")) 
+Grad.Rates <- as.numeric(gsub("%</em","",Grad.Rates[3]))/100
+
+Test.Scores <- grep("            <div class=\"facts-box-body\"><em>",city.data,value=TRUE)
+Test.Scores <- unlist(strsplit(Test.Scores[12],split=">")) 
+Test.Scores <- as.numeric(gsub("%</em","",Test.Scores[3]))/100
+
+Poverty.Rate <-  unlist(strsplit(grep("Unemployment rate</td><td>",job.data,value=TRUE), split="<td>"))
+Poverty.Rate <- (as.numeric(gsub("%</td>","",Poverty.Rate[31])))/100
+
+Crimes.100K <- grep("facts-box-body\"><em data-subtext=\"per 100K people",city.data,value=TRUE)
+Crimes.100K <- unlist(strsplit(Crimes.100K,split="<"))
+Crimes.100K <- as.numeric(gsub("em data-subtext=\"per 100K people\">|,","",Crimes.100K[3]))
+
+Median.Home.Value <- grep("            <div class=\"facts-box-body\"><em>",city.data,value=TRUE)
+Median.Home.Value <- unlist(strsplit(Median.Home.Value[8],split=">")) 
+Median.Home.Value <- gsub("</em","",Median.Home.Value[3])
+Median.Home.Value <- as.numeric(gsub("\\$|,","",Median.Home.Value))
+
+Median.Rent <- grep("            <div class=\"facts-box-body\"><em>",city.data,value=TRUE)
+Median.Rent <- unlist(strsplit(Median.Rent[9],split=">")) 
+Median.Rent <- gsub("</em","",Median.Rent[3])
+Median.Rent <- as.numeric(gsub("\\$|,","",Median.Rent))
+  
+Median.Household.Income <- grep("<div class=\"facts-box-body\"><em>",city.data,value=TRUE)
+Median.Household.Income <- unlist(strsplit(Median.Household.Income[5],split="<"))
+Median.Household.Income <- as.numeric(gsub("em>\\$|,","",Median.Household.Income[3]))
+
+Income.Per.Capita <- grep("<div class=\"facts-box-body\"><em>",city.data,value=TRUE)
+Income.Per.Capita <- unlist(strsplit(Income.Per.Capita[6],split="<"))
+Income.Per.Capita <- as.numeric(gsub("em>\\$|,","",Income.Per.Capita[3]))
+  
+return(list(City.Name=City.Name,Population.Density=Population.Density,Median.Age=Median.Age,Poverty.Rate=Poverty.Rate,Crimes.100K=Crimes.100K,Median.Household.Income=Median.Household.Income,Income.Per.Capita=Income.Per.Capita,Median.Home.Value=Median.Home.Value,Median.Rent=Median.Rent,Grad.Rates=Grad.Rates,Test.Scores=Test.Scores))
+}
+```
+
+```{r warning=FALSE}
+
+# The function then had to be applied to each city collected previously. This was achieved through utilizing the sapply function and loops.
+
+data <- sapply(all.ma.cities,city.data) #applies function to all cities in MA
+data <- as.data.frame(t(data))
+for (i in 1:dim(data)[2])
+data[,i] <- unlist(data[,i])
+
+data2 <- sapply(all.wv.cities,city.data)
+data2 <- as.data.frame(t(data2))
+for (i in 1:dim(data2)[2])
+data2[,i] <- unlist(data2[,i])
+
+data3 <- sapply(all.al.cities,city.data)
+data3 <- as.data.frame(t(data3))
+for (i in 1:dim(data3)[2])
+data3[,i] <- unlist(data3[,i])
+
+data4 <- sapply(all.md.cities,city.data)
+data4 <- as.data.frame(t(data4))
+for (i in 1:dim(data4)[2])
+data4[,i] <- unlist(data4[,i])
+
+data5 <- sapply(all.nh.cities,city.data)
+data5 <- as.data.frame(t(data5))
+for (i in 1:dim(data5)[2])
+data5[,i] <- unlist(data5[,i])
+```
+
+## Introduction {data-background=border.jpg data-background-size=cover}
+
+The goal of this project was to create a prediction model to forecast median home values within a city based upon factors outside of the home's build. 
+
+The observed variables were associated with the location of the home, variables such as;
+
+- Crime Rates
+- Median Age
+- Income Per Capita
+- And more
+
+## Statistical Method {data-background=border.jpg data-background-size=cover}
+
+A statistial method had to be chosen in order create the prediction model and determine how to properly and accurately predict median home values within cities. 
+
+Once a statisical method was chosen, data was collected in order create a prediction model.
+
+<center>
+![](https://miro.medium.com/max/402/1*2foyXif7hwkO8wWB5T9KtQ.png)
+</center>
+
+## Regression Analysis {data-background=border.jpg data-background-size=cover}
+
+The statistical method used for this project was regression analysis. Multiple variables were examined in order to observe their relationship with the chosen dependent varaiable, median home values.
+
+<center>
+![](https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Linear_regression.svg/400px-Linear_regression.svg.png)
+</center>
+
+
+## Data Collection {data-background=border.jpg data-background-size=cover}
+
+
+Data was collected through webscraping methods in R from the online platform "AreaVibes.com." 
+
+AreaVibes is a website that ranks the best places to live in the United States. This is accomplished by assigning their trademark "Livability Score" out of 100 to any address, zip code, neighborhood or city within their database. 
+
+<center>
+
+![](https://res-5.cloudinary.com/crunchbase-production/image/upload/c_lpad,h_256,w_256,f_auto,q_auto:eco/v1397751667/02c4dc0452fa4288886fc85cebf2c91a.jpg)
+</center>
+
+
+## AreaVibes Cont. {data-background=border.jpg data-background-size=cover}
+
+The Livability Scores are determined by various characteristics spanning across 7 categories.
+
+- Amenities
+- Cost of Living
+- Crime Rates
+- Education 
+- Employment 
+- Housing 
+- Weather
+
+AreaVibes collects all of this information from the Federal Bureau of Investigation and  United States Census Bureau.
+
+## Data Summary {data-background=border.jpg data-background-size=cover}
+
+In the end, the data spanned across 
+
+- 5 States
+- 1800+ Cities (rows)
+- 10+ Location Characteristics Each (columns)
+
+<center>
+![](https://image.shutterstock.com/image-vector/map-united-states-america-glowing-260nw-725683462.jpg)
+</center>
+
+
+## Data Summary {data-background=border.jpg data-background-size=cover}
+```{r warning=FALSE,message=FALSE}
+library(dplyr)
+```
+
+```{r}
+# The dataframe from each state was then combined into one dataframe containing over 1800 cities
+
+Total.Data <- rbind(data,data2,data3,data4,data5)
+```
+
+```{r echo=FALSE}
+sub.data <- (Total.Data %>% select(Population.Density, Median.Age,Median.Household.Income))
+```
+
+```{r, comment = "", warning=FALSE}
+head(sub.data,n=15)
+```
+
+```{r}
+#The data was then cleaned of influential outliers and errors 
+
+income.outs <- boxplot(Total.Data$Median.Household.Income,plot=FALSE)$out #boxplot to find outliers
+grad.outs <- boxplot(Total.Data$Grad.Rates,plot=FALSE)$out
+value.outs <- boxplot(Total.Data$Median.Home.Value,plot=FALSE)$out
+capita.outs <- boxplot(Total.Data$Income.Per.Capita,plot=FALSE)$out
+poverty.outs <- boxplot(Total.Data$Poverty.Rate,plot=FALSE)$out
+density.outs <- boxplot(Total.Data$Population.Density,plot=FALSE)$out
+age.outs <- boxplot(Total.Data$Median.Age,plot=FALSE)$out
+
+t.0 <- Total.Data[-which(Total.Data$Poverty.Rate %in% poverty.outs),] #creating dataframe w/o outliers
+t.0 <- t.0[-which(t.0$Median.Household.Income %in% income.outs),]
+t.0 <- t.0[-which(t.0$Grad.Rates %in% grad.outs),]
+t.0 <- t.0[-which(t.0$Median.Home.Value %in% value.outs),]
+t.0 <- t.0[-which(t.0$Income.Per.Capita %in% capita.outs),]
+t.0 <- t.0[-which(t.0$Median.Home.Value %in% 0),]
+t.0 <- t.0[-which(t.0$Median.Rent %in% 0),]
+t.0 <- t.0[-which(t.0$Test.Scores %in% NA),]
+```
+
+## Choosing Independent Variables {data-background=border.jpg data-background-size=cover}
+
+Which top 3 variables do you think had the strongest correlations to Median Home Values?
+
+- Population Density
+- Crime Rates
+- Graduation Rates
+- Median Household Income
+- Income Per Capita
+- Test Scores
+- Median Rent
+- Median Age
+- Graduation Rates
+
+## Choosing Independent Variables Cont. {data-background=border.jpg data-background-size=cover}
+
+Which top 3 variables do you think had the strongest correlations to Median Home Values?
+
+- Population Density
+- Crime Rates
+- Graduation Rates
+- <div class="green2">**Median Household Income**</div>
+- <div class="green2">**Income Per Capita**</div>
+- Test Scores
+- <div class="green2">**Median Rent**</div> 
+- Median Age
+- Graduation Rates
+
+## Scatter Plots {data-background=border.jpg data-background-size=cover}
+
+- Median Age and Median Home Values showed virtually no linear relationship
+
+```{r}
+#Data visualization was then utilized to showcase the effect errors and outliers had on the data
+
+scatter.smooth(x=Total.Data$Median.Age, y=Total.Data$Median.Home.Value, xlab='Median Age', ylab = 'Median Home Value', main="Home Values ~ Median Age")
+```
+
+## Scatter Plots {data-background=border.jpg data-background-size=cover}
+
+- Income Per Capita and Median Household Incomes suggested stronger linear relationships with Median Home Values
+
+```{r}
+scatter.smooth(x=Total.Data$Income.Per.Capita, y=Total.Data$Median.Home.Value, xlab = "Income Per Capita", ylab = "Median Home Values", main="Home Values ~ Income Per Capita")
+```
+
+## Scatter Plots {data-background=border.jpg data-background-size=cover}
+```{r}
+scatter.smooth(x=Total.Data$Median.Household.Income, y=Total.Data$Median.Home.Value, xlab = "Median Household Income", ylab= "Median Home Values", main="Home Values ~ Median Household Income")
+```
+
+## Scatter Plots {data-background=border.jpg data-background-size=cover}
+
+```{r}
+scatter.smooth(x=Total.Data$Median.Rent, y=Total.Data$Median.Home.Value, xlab = "Median Rent", ylab= "Median Home Values",main="Home Values ~ Median Rent")
+```
+
+## Data Cleaning {data-background=border.jpg data-background-size=cover}
+
+Before creating a prediciton model, the data had to first be cleaned in order to remove inconsistencies. 
+Examples of reasons to clean the data
+
+- Instances where median rent was 0 dollars a month
+- Test scores were unavailable
+- There were more violent crimes than total crimes
+
+<center>
+![](https://cache-landingpages-images.services.handy.com/2018/09/17/21/44/02/7574430b-aae1-4eb6-bf56-b32464714459/DeepClean2.jpg)
+</center>
+
+
+## Box Plots {data-background=border.jpg data-background-size=cover}
+
+- Measure of how well distributed the data is within a data set 
+- The box in the middle represents the Interquartile Range 
+- The lines represent the "Minimum" and "Maximum" 
+- Points outside of those ranges are considered outliers 
+
+In some cases, outliers were removed to lessen their influence on the model. 
+
+<center>
+![](https://photos3.fotosearch.com/bthumb/CSP/CSP996/trash-can-illustration-stock-illustration__k17164845.jpg)
+</center>
+
+
+## Box Plots {data-background=border.jpg data-background-size=cover}
+
+```{r}
+par(mfrow=c(1, 2))  # divide graph area in 2 columns
+
+boxplot(Total.Data$Median.Rent, main="Median Rent", sub=paste(""))  # box plot for 'Median Rent'
+
+boxplot(Total.Data$Median.Home.Value, main="Median Home Value", sub=paste(""))
+```
+
+## Before Cleaning the Data {data-background=border.jpg data-background-size=cover}
+
+```{r}
+scatter.smooth(x=Total.Data$Median.Rent, y=Total.Data$Median.Home.Value, xlab = "Median Rent", ylab= "Median Home Value", main="Home Values ~ Median Rent")
+```
+
+## After Cleaning the Data {data-background=border.jpg data-background-size=cover}
+
+```{r}
+scatter.smooth(x=t.0$Median.Rent, y=t.0$Median.Home.Value, xlab = "Median Rent", ylab= "Median Home Value",  main="Home Values ~ Median Rent")
+```
+
+## Correlation Analysis {data-background=border.jpg data-background-size=cover}
+
+Each of the independent variables were analyzed after cleaning to confirm their correlation to the independent variable. 
+
+Essentially, the following function was performed for each combination of variables.
+
+```{r comment="",echo=TRUE} 
+cor(t.0$Income.Per.Capita,t.0$Median.Home.Value) #determines correlation among variables
+```
+
+## Correlation Analysis {data-background=border.jpg data-background-size=cover}
+
+Based on the analysis, the four variables with the highest correlations are
+
+- Income Per Capita
+- Median Household Income
+- Median Rent
+- Graduation Rates
+ 
+## Creating the Linear Model {data-background=border.jpg data-background-size=cover}
+
+```{r echo = TRUE}
+firstlinearMod <- lm(Median.Home.Value ~ Income.Per.Capita + 
+Median.Rent + Grad.Rates + Median.Household.Income, data=t.0) #creates linear model
+```
+```{r, comment="", echo =TRUE}
+summary(firstlinearMod)$coefficients #summarizes linear model after creation
+summary(firstlinearMod)$adj.r.squared 
+```
+
+## Creating the Linear Model {data-background=border.jpg data-background-size=cover}
+Other variables can be added to the model to see if they can explain more of the variance.
+
+For example, let's see what happens when we replace "Graduation Rates" with "Test Scores" and add "Poverty Rates" to the model.
+
+```{r comment="", echo = TRUE}
+secondlinearMod <- lm(Median.Home.Value ~ Income.Per.Capita + 
+Poverty.Rate + Median.Rent + Test.Scores + 
+Median.Household.Income, data=t.0) #creates second linear model
+```
+
+***
+```{r comment="",echo=TRUE}
+summary(secondlinearMod)$coefficients #summary shows it is potential more accurate
+summary(firstlinearMod)$adj.r.squared
+summary(secondlinearMod)$adj.r.squared
+```
+
+
+## Predicting with the Linear Model {data-background=border.jpg data-background-size=cover}
+
+However, creating a prediction model with the entire dataset will not tell us how the prediction model performs with new data.
+
+The data must be split into two datasets
+
+- Training (80%)
+- Testing (20%) 
+
+```{r echo = TRUE}
+trainingRowIndex <- sample(1:nrow(t.0), 0.8*nrow(t.0)) #split data into training and test sets
+trainingData <- t.0[trainingRowIndex, ] 
+testData  <- t.0[-trainingRowIndex, ]  
+```
+
+```{r}
+lmMod <- lm(Median.Home.Value ~ Income.Per.Capita + Median.Household.Income + Poverty.Rate + Median.Rent + Test.Scores, data=trainingData) 
+HomePred <- predict(lmMod, testData) #creates final linear model 
+```
+ 
+## Prediction Model {data-background=border.jpg data-background-size=cover}
+
+A regression function can now be created.
+
+- Income Per Capita = X1
+- Median Household Income = X2
+- Poverty Rate = X3
+- Median Rent = X4
+- Test Scores = X5
+
+Y = -1.719822e+05 + 5.057e+00X1 + 6.750e-01X2 + 1.429e+05X3 + 9.942e+01X4 + 1.635e+05X5
+
+## Residuals {data-background=border.jpg data-background-size=cover}
+
+```{r}
+#Plot residuals to confirm constant variance 
+
+plot(lmMod$residuals, xlab = "Index", ylab= "Residuals", pch = 16, col = "red")
+```
+
+## Residuals {data-background=border.jpg data-background-size=cover}
+
+```{r}
+par(mfrow=c(2,2))
+plot(lmMod)
+```
+
+## Example {data-background=border.jpg data-background-size=cover}
+
+Example (Dedham, MA)
+
+- Income Per Capita = 44792
+- Median Household Income = 87108
+- Poverty Rate = 0.047
+- Median Rent = 1460
+- Test Scores = 0.74
+
+Y = -1.719822e+05 + 5.057e+00(44792) + 6.750e-01(87108) + 1.429e+05(0.047) + 9.942e+01(1460) + 1.635e+05(0.74)
+Y = 386170.98
+
+- Predicted = 386,170.98
+- Actual = 394,200.00
+
+
+## Checking the Model's Accuracy {data-background=border.jpg data-background-size=cover}
+
+The accuracy of the model can be ascertained through analyzing
+
+- Adjusted R^2 
+- Correlation Accuracy
+- Mean Absolute Percentage Error
+- Min Max Accuracy
+
+***
+```{r}
+actuals_preds <- data.frame(cbind(actuals=testData$Median.Home.Value, predicteds=HomePred))  
+correlation_accuracy <- cor(actuals_preds)  
+min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))  
+Mean.Absolute.Percentage <- mean(abs((actuals_preds$predicteds - actuals_preds$actuals))/actuals_preds$actuals)  
+adjusted.R.sq <- summary(lmMod)$adj.r.squared 
+```
+
+```{r comment="",echo=TRUE}
+#Showcase metrics used to gauge accuracy
+
+adjusted.R.sq
+correlation_accuracy
+Mean.Absolute.Percentage
+min_max_accuracy
+```
+
+## Accuracy of Model {data-background=border.jpg data-background-size=cover}
+The above information suggests the prediction model is accurate and can serve as a prediction model for forecasting Median Home Values within locations.
+
+<center>
+![](https://www.csdsinc.com/wp-content/uploads/2017/09/Bullseye-750.jpg)
+</center>
+
+## Questions? {data-background=border.jpg data-background-size=cover}
+
+<center>
+![](https://health.wyo.gov/wp-content/uploads/2017/05/confused-older-man.jpg)
+</center>
+

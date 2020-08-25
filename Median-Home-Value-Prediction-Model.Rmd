@@ -22,35 +22,35 @@ city.page <- readLines('https://www.areavibes.com/ma/',warn=FALSE)
 #Found a unique identifier for each line containing a city name and then reduced the line to just the city name
 
 all.ma.cities <- grep('href=',city.page, value=TRUE) 
-all.ma.cities <- unlist(strsplit(all.ma.cities[23],split="href"))
+all.ma.cities <- unlist(strsplit(all.ma.cities[44],split="href"))
 all.ma.cities <- unlist(strsplit(all.ma.cities[2:247],split="/"))
-all.ma.cities <- all.ma.cities[seq(from = 2, to = length(all.ma.cities),by = 5)]
+all.ma.cities <- all.ma.cities[seq(from = 2, to = length(all.ma.cities),by = 4)]
 
 #The above step was completed for 5 states in total
 
 city.page <- readLines('https://www.areavibes.com/wv/',warn=FALSE)
 all.wv.cities <- grep('href=',city.page, value=TRUE)
-all.wv.cities <- unlist(strsplit(all.wv.cities[23],split="href"))
+all.wv.cities <- unlist(strsplit(all.wv.cities[44],split="href"))
 all.wv.cities <- unlist(strsplit(all.wv.cities[2:length(all.wv.cities)],split="/"))
-all.wv.cities <- all.wv.cities[seq(from = 2, to = length(all.wv.cities),by = 5)]
+all.wv.cities <- all.wv.cities[seq(from = 2, to = length(all.wv.cities),by = 4)]
 
 city.page <- readLines('https://www.areavibes.com/al/',warn=FALSE)
 all.al.cities <- grep('href=',city.page, value=TRUE)
-all.al.cities <- unlist(strsplit(all.al.cities[23],split="href"))
+all.al.cities <- unlist(strsplit(all.al.cities[44],split="href"))
 all.al.cities <- unlist(strsplit(all.al.cities[2:length(all.al.cities)],split="/"))
-all.al.cities <- all.al.cities[seq(from = 2, to = length(all.al.cities),by = 5)]
+all.al.cities <- all.al.cities[seq(from = 2, to = length(all.al.cities),by = 4)]
 
 city.page <- readLines('https://www.areavibes.com/md/',warn=FALSE)
 all.md.cities <- grep('href=',city.page, value=TRUE)
-all.md.cities <- unlist(strsplit(all.md.cities[23],split="href"))
+all.md.cities <- unlist(strsplit(all.md.cities[44],split="href"))
 all.md.cities <- unlist(strsplit(all.md.cities[2:length(all.md.cities)],split="/"))
-all.md.cities <- all.md.cities[seq(from = 2, to = length(all.md.cities),by = 5)]
+all.md.cities <- all.md.cities[seq(from = 2, to = length(all.md.cities),by = 4)]
 
 city.page <- readLines('https://www.areavibes.com/nh/',warn=FALSE)
 all.nh.cities <- grep('href=',city.page, value=TRUE)
-all.nh.cities <- unlist(strsplit(all.nh.cities[23],split="href"))
+all.nh.cities <- unlist(strsplit(all.nh.cities[44],split="href"))
 all.nh.cities <- unlist(strsplit(all.nh.cities[2:length(all.nh.cities)],split="/"))
-all.nh.cities <- all.nh.cities[seq(from = 2, to = length(all.nh.cities),by = 5)]
+all.nh.cities <- all.nh.cities[seq(from = 2, to = length(all.nh.cities),by = 4)]
 ```
 
 ```{r}
@@ -75,8 +75,8 @@ job.data <- readLines(job.address,warn=FALSE)
 
 #Various points of data was then collected for each city
 
-City.Name <- grep("            <h2>",city.data,value=TRUE)
-City.Name <- as.character(gsub("            <h2>|</h2>","",City.Name))
+City.Name <- grep("            <strong>",city.data,value=TRUE)
+City.Name <- as.character(gsub("            <strong>|</strong>","",City.Name[1]))
 
 Population.Density <-  grep("\t\t\t\t\t\t<tr><td>Population density",demo.data,value=TRUE)
 Population.Density <- unlist(strsplit(Population.Density, split="<td>"))

@@ -7,6 +7,7 @@ output:
      logo: cartoonlogo.png
   html_document: default
   code_folding: hide
+
 ---
 
 ```{r setup, include=FALSE}
@@ -78,6 +79,10 @@ job.data <- readLines(job.address,warn=FALSE)
 City.Name <- grep("            <strong>",city.data,value=TRUE)
 City.Name <- as.character(gsub("            <strong>|</strong>","",City.Name[1]))
 
+State.Name = grep("state_abbr",city.data,value=TRUE)
+State.Name = unlist(strsplit(State.Name[1],split="\""))
+State.Name = as.character(State.Name[22])
+
 Population.Density <-  grep("\t\t\t\t\t\t<tr><td>Population density",demo.data,value=TRUE)
 Population.Density <- unlist(strsplit(Population.Density, split="<td>"))
 Population.Density <- as.numeric(gsub("</td>|,","",Population.Density[3]))
@@ -120,7 +125,7 @@ Income.Per.Capita <- grep("<div class=\"facts-box-body\"><em>",city.data,value=T
 Income.Per.Capita <- unlist(strsplit(Income.Per.Capita[6],split="<"))
 Income.Per.Capita <- as.numeric(gsub("em>\\$|,","",Income.Per.Capita[3]))
   
-return(list(City.Name=City.Name,Population.Density=Population.Density,Median.Age=Median.Age,Poverty.Rate=Poverty.Rate,Crimes.100K=Crimes.100K,Median.Household.Income=Median.Household.Income,Income.Per.Capita=Income.Per.Capita,Median.Home.Value=Median.Home.Value,Median.Rent=Median.Rent,Grad.Rates=Grad.Rates,Test.Scores=Test.Scores))
+return(list(City.Name=City.Name,State.Name=State.Name,Population.Density=Population.Density,Median.Age=Median.Age,Poverty.Rate=Poverty.Rate,Crimes.100K=Crimes.100K,Median.Household.Income=Median.Household.Income,Income.Per.Capita=Income.Per.Capita,Median.Home.Value=Median.Home.Value,Median.Rent=Median.Rent,Grad.Rates=Grad.Rates,Test.Scores=Test.Scores))
 }
 ```
 
@@ -223,8 +228,6 @@ In the end, the data spanned across
 ![](https://image.shutterstock.com/image-vector/map-united-states-america-glowing-260nw-725683462.jpg)
 </center>
 
-
-## Data Summary {data-background=border.jpg data-background-size=cover}
 ```{r warning=FALSE,message=FALSE}
 library(dplyr)
 ```
@@ -235,33 +238,35 @@ library(dplyr)
 Total.Data <- rbind(data,data2,data3,data4,data5)
 ```
 
-```{r echo=FALSE}
-sub.data <- (Total.Data %>% select(Population.Density, Median.Age,Median.Household.Income))
-```
+```{r}
+# Rows with the 0 value error are removed
+Dirty.Data <- Total.Data
 
-```{r, comment = "", warning=FALSE}
-head(sub.data,n=15)
+Total.Data <- Total.Data[-which(Total.Data$Population.Density %in% 0),]
+Total.Data <- Total.Data[-which(Total.Data$Median.Age %in% 0),]
+
+Total.Data <- Total.Data[-which(Total.Data$Median.Household.Income %in% 0),]
+Total.Data <- Total.Data[-which(Total.Data$Median.Home.Value %in% 0),]
+Total.Data <- Total.Data[-which(Total.Data$Median.Rent %in% 0),]
 ```
 
 ```{r}
-#The data was then cleaned of influential outliers and errors 
+# Two methods will be used to handle NAs
 
-income.outs <- boxplot(Total.Data$Median.Household.Income,plot=FALSE)$out #boxplot to find outliers
-grad.outs <- boxplot(Total.Data$Grad.Rates,plot=FALSE)$out
-value.outs <- boxplot(Total.Data$Median.Home.Value,plot=FALSE)$out
-capita.outs <- boxplot(Total.Data$Income.Per.Capita,plot=FALSE)$out
-poverty.outs <- boxplot(Total.Data$Poverty.Rate,plot=FALSE)$out
-density.outs <- boxplot(Total.Data$Population.Density,plot=FALSE)$out
-age.outs <- boxplot(Total.Data$Median.Age,plot=FALSE)$out
+# Method 1: Omit rows with NAs and 0s
 
-t.0 <- Total.Data[-which(Total.Data$Poverty.Rate %in% poverty.outs),] #creating dataframe w/o outliers
-t.0 <- t.0[-which(t.0$Median.Household.Income %in% income.outs),]
-t.0 <- t.0[-which(t.0$Grad.Rates %in% grad.outs),]
-t.0 <- t.0[-which(t.0$Median.Home.Value %in% value.outs),]
-t.0 <- t.0[-which(t.0$Income.Per.Capita %in% capita.outs),]
-t.0 <- t.0[-which(t.0$Median.Home.Value %in% 0),]
-t.0 <- t.0[-which(t.0$Median.Rent %in% 0),]
-t.0 <- t.0[-which(t.0$Test.Scores %in% NA),]
+t.0 <- na.omit(Total.Data)
+```
+
+```{r}
+#Method 2: Impute NAs with the column's median
+
+imp.data = Total.Data
+
+for (i in which(sapply(imp.data,is.numeric))) {
+  imp.data[is.na(imp.data[,i]),i] = median(imp.data[,i], na.rm = TRUE)
+}
+
 ```
 
 ## Choosing Independent Variables {data-background=border.jpg data-background-size=cover}
@@ -299,7 +304,7 @@ Which top 3 variables do you think had the strongest correlations to Median Home
 ```{r}
 #Data visualization was then utilized to showcase the effect errors and outliers had on the data
 
-scatter.smooth(x=Total.Data$Median.Age, y=Total.Data$Median.Home.Value, xlab='Median Age', ylab = 'Median Home Value', main="Home Values ~ Median Age")
+scatter.smooth(x=Dirty.Data$Median.Age, y=Dirty.Data$Median.Home.Value, xlab='Median Age', ylab = 'Median Home Value', main="Home Values ~ Median Age")
 ```
 
 ## Scatter Plots {data-background=border.jpg data-background-size=cover}
@@ -307,42 +312,48 @@ scatter.smooth(x=Total.Data$Median.Age, y=Total.Data$Median.Home.Value, xlab='Me
 - Income Per Capita and Median Household Incomes suggested stronger linear relationships with Median Home Values
 
 ```{r}
-scatter.smooth(x=Total.Data$Income.Per.Capita, y=Total.Data$Median.Home.Value, xlab = "Income Per Capita", ylab = "Median Home Values", main="Home Values ~ Income Per Capita")
+scatter.smooth(x=Dirty.Data$Income.Per.Capita, y=Dirty.Data$Median.Home.Value, xlab = "Income Per Capita", ylab = "Median Home Values", main="Home Values ~ Income Per Capita")
 ```
 
 ## Scatter Plots {data-background=border.jpg data-background-size=cover}
 ```{r}
-scatter.smooth(x=Total.Data$Median.Household.Income, y=Total.Data$Median.Home.Value, xlab = "Median Household Income", ylab= "Median Home Values", main="Home Values ~ Median Household Income")
+scatter.smooth(x=Dirty.Data$Median.Household.Income, y=Dirty.Data$Median.Home.Value, xlab = "Median Household Income", ylab= "Median Home Values", main="Home Values ~ Median Household Income")
 ```
 
 ## Scatter Plots {data-background=border.jpg data-background-size=cover}
 
 ```{r}
-scatter.smooth(x=Total.Data$Median.Rent, y=Total.Data$Median.Home.Value, xlab = "Median Rent", ylab= "Median Home Values",main="Home Values ~ Median Rent")
+scatter.smooth(x=Dirty.Data$Median.Rent, y=Dirty.Data$Median.Home.Value, xlab = "Median Rent", ylab= "Median Home Values",main="Home Values ~ Median Rent")
 ```
 
 ## Data Cleaning {data-background=border.jpg data-background-size=cover}
 
-Before creating a prediciton model, the data had to first be cleaned in order to remove inconsistencies. 
+Before creating a prediction model, the data had to first be cleaned in order to remove inconsistencies. 
 Examples of reasons to clean the data
 
 - Instances where median rent was 0 dollars a month
-- Test scores were unavailable
-- There were more violent crimes than total crimes
+- Test scores were unavailable or "NA
 
 <center>
 ![](https://cache-landingpages-images.services.handy.com/2018/09/17/21/44/02/7574430b-aae1-4eb6-bf56-b32464714459/DeepClean2.jpg)
 </center>
+## Handling Missing Data
 
+Missing Data, NAs, can be addressed in several different ways. Two data sets were created that utilized two of the possible methods.
+
+- Omitting rows with "NA" values
+- Replacing the "NA" values with each column's median
+
+We will determine which data set leads to a more accurate prediction model.  
 
 ## Box Plots {data-background=border.jpg data-background-size=cover}
 
 - Measure of how well distributed the data is within a data set 
 - The box in the middle represents the Interquartile Range 
 - The lines represent the "Minimum" and "Maximum" 
-- Points outside of those ranges are considered outliers 
+- Points outside of those ranges are considered outliers
 
-In some cases, outliers were removed to lessen their influence on the model. 
+Box plots are an effective tool for locating outliers within your data. If the outliers are errors, it is important to remove them.  
 
 <center>
 ![](https://photos3.fotosearch.com/bthumb/CSP/CSP996/trash-can-illustration-stock-illustration__k17164845.jpg)
@@ -362,7 +373,7 @@ boxplot(Total.Data$Median.Home.Value, main="Median Home Value", sub=paste(""))
 ## Before Cleaning the Data {data-background=border.jpg data-background-size=cover}
 
 ```{r}
-scatter.smooth(x=Total.Data$Median.Rent, y=Total.Data$Median.Home.Value, xlab = "Median Rent", ylab= "Median Home Value", main="Home Values ~ Median Rent")
+scatter.smooth(x=Dirty.Data$Median.Rent, y=Dirty.Data$Median.Home.Value, xlab = "Median Rent", ylab= "Median Home Value", main="Home Values ~ Median Rent")
 ```
 
 ## After Cleaning the Data {data-background=border.jpg data-background-size=cover}
@@ -377,8 +388,8 @@ Each of the independent variables were analyzed after cleaning to confirm their 
 
 Essentially, the following function was performed for each combination of variables.
 
-```{r comment="",echo=TRUE} 
-cor(t.0$Income.Per.Capita,t.0$Median.Home.Value) #determines correlation among variables
+```{r, comment="",echo=TRUE} 
+cor(t.0$Income.Per.Capita,t.0$Median.Home.Value)
 ```
 
 ## Correlation Analysis {data-background=border.jpg data-background-size=cover}
@@ -391,13 +402,16 @@ Based on the analysis, the four variables with the highest correlations are
 - Graduation Rates
  
 ## Creating the Linear Model {data-background=border.jpg data-background-size=cover}
+```{r}
+#Create Linear Model
+```
 
 ```{r echo = TRUE}
 firstlinearMod <- lm(Median.Home.Value ~ Income.Per.Capita + 
-Median.Rent + Grad.Rates + Median.Household.Income, data=t.0) #creates linear model
+Median.Rent + Grad.Rates + Median.Household.Income, data=t.0)
 ```
-```{r, comment="", echo =TRUE}
-summary(firstlinearMod)$coefficients #summarizes linear model after creation
+```{r, message=FALSE, echo =TRUE}
+summary(firstlinearMod)$coefficients 
 summary(firstlinearMod)$adj.r.squared 
 ```
 
@@ -406,20 +420,22 @@ Other variables can be added to the model to see if they can explain more of the
 
 For example, let's see what happens when we replace "Graduation Rates" with "Test Scores" and add "Poverty Rates" to the model.
 
-```{r comment="", echo = TRUE}
+```{r message=FALSE, echo = TRUE}
 secondlinearMod <- lm(Median.Home.Value ~ Income.Per.Capita + 
 Poverty.Rate + Median.Rent + Test.Scores + 
-Median.Household.Income, data=t.0) #creates second linear model
+Median.Household.Income, data=t.0) 
 ```
 
 ***
-```{r comment="",echo=TRUE}
-summary(secondlinearMod)$coefficients #summary shows it is potential more accurate
+```{r message=FALSE,echo=TRUE}
+summary(secondlinearMod)$coefficients
 summary(firstlinearMod)$adj.r.squared
 summary(secondlinearMod)$adj.r.squared
 ```
 
-
+```{r}
+# The above summary shows it may be more accurate
+```
 ## Predicting with the Linear Model {data-background=border.jpg data-background-size=cover}
 
 However, creating a prediction model with the entire dataset will not tell us how the prediction model performs with new data.
@@ -429,20 +445,31 @@ The data must be split into two datasets
 - Training (80%)
 - Testing (20%) 
 
-```{r echo = TRUE}
-trainingRowIndex <- sample(1:nrow(t.0), 0.8*nrow(t.0)) #split data into training and test sets
+```{r}
+set.seed(43)
+# First split training/test data for 'Omitted' version
+trainingRowIndex <- sample(1:nrow(t.0), 0.8*nrow(t.0))
 trainingData <- t.0[trainingRowIndex, ] 
-testData  <- t.0[-trainingRowIndex, ]  
+testData  <- t.0[-trainingRowIndex, ]
+
+# Next for "Imputed" version
+trainingRowIndex2 <- sample(1:nrow(imp.data), 0.8*nrow(imp.data))
+trainingData2 <- imp.data[trainingRowIndex, ] 
+testData2  <- imp.data[-trainingRowIndex, ]
 ```
 
 ```{r}
 lmMod <- lm(Median.Home.Value ~ Income.Per.Capita + Median.Household.Income + Poverty.Rate + Median.Rent + Test.Scores, data=trainingData) 
-HomePred <- predict(lmMod, testData) #creates final linear model 
+HomePred <- predict(lmMod, testData) #creates final linear model
+
+
+lmMod2 <- lm(Median.Home.Value ~ Income.Per.Capita + Median.Household.Income + Poverty.Rate + Median.Rent + Test.Scores, data=trainingData2) 
+HomePred2 <- predict(lmMod, testData2) #creates final linear model
 ```
  
 ## Prediction Model {data-background=border.jpg data-background-size=cover}
 
-A regression function can now be created.
+A regression function can now be created. 
 
 - Income Per Capita = X1
 - Median Household Income = X2
@@ -450,7 +477,9 @@ A regression function can now be created.
 - Median Rent = X4
 - Test Scores = X5
 
-Y = -1.719822e+05 + 5.057e+00X1 + 6.750e-01X2 + 1.429e+05X3 + 9.942e+01X4 + 1.635e+05X5
+The function created for the "Omitted" version is:
+
+Y =  -2.336e+05 + 7.786e+00X1 + 6.648e-01X2 + 2.494e+05X3 + 1.075e+02X4 + 1.539e+05X5
 
 ## Residuals {data-background=border.jpg data-background-size=cover}
 
@@ -469,19 +498,18 @@ plot(lmMod)
 
 ## Example {data-background=border.jpg data-background-size=cover}
 
-Example (Dedham, MA)
+Example (Athol, MA)
 
-- Income Per Capita = 44792
-- Median Household Income = 87108
-- Poverty Rate = 0.047
-- Median Rent = 1460
-- Test Scores = 0.74
+- Income Per Capita = 22206
+- Median Household Income = 43619	
+- Poverty Rate = 0.217
+- Median Rent = 661
+- Test Scores = 0.45
 
-Y = -1.719822e+05 + 5.057e+00(44792) + 6.750e-01(87108) + 1.429e+05(0.047) + 9.942e+01(1460) + 1.635e+05(0.74)
-Y = 386170.98
+Y = -2.336e+05 + 7.786e+00(22206) + 6.648e-01(43619) + 2.494e+05(0.217) + 1.075e+02(661) + 1.539e+05(0.45)
 
-- Predicted = 386,170.98
-- Actual = 394,200.00
+- Predicted = $143,272.304
+- Actual = $132,400.00
 
 
 ## Checking the Model's Accuracy {data-background=border.jpg data-background-size=cover}
@@ -501,22 +529,53 @@ min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, 
 Mean.Absolute.Percentage <- mean(abs((actuals_preds$predicteds - actuals_preds$actuals))/actuals_preds$actuals)  
 adjusted.R.sq <- summary(lmMod)$adj.r.squared 
 ```
-
+  
 ```{r comment="",echo=TRUE}
-#Showcase metrics used to gauge accuracy
-
 adjusted.R.sq
 correlation_accuracy
 Mean.Absolute.Percentage
 min_max_accuracy
 ```
 
+```{r}
+actuals_preds2 <- data.frame(cbind(actuals=testData2$Median.Home.Value, predicteds=HomePred2))  
+correlation_accuracy2 <- cor(actuals_preds2)  
+min_max_accuracy2 <- mean(apply(actuals_preds2, 1, min) / apply(actuals_preds2, 1, max))  
+Mean.Absolute.Percentage2 <- mean(abs((actuals_preds2$predicteds - actuals_preds2$actuals))/actuals_preds2$actuals)  
+adjusted.R.sq2 <- summary(lmMod2)$adj.r.squared 
+```
+***  
+```{r comment="",echo=TRUE}
+adjusted.R.sq2
+correlation_accuracy2
+Mean.Absolute.Percentage2
+min_max_accuracy2
+```
 ## Accuracy of Model {data-background=border.jpg data-background-size=cover}
 The above information suggests the prediction model is accurate and can serve as a prediction model for forecasting Median Home Values within locations.
 
 <center>
 ![](https://www.csdsinc.com/wp-content/uploads/2017/09/Bullseye-750.jpg)
 </center>
+
+## NAs: Omitted vs Imputation
+
+Between omitting NAs and imputing the median, the data implies that imputing the median created a better performing and more accurate model. 
+
+The imputed version was able to retain more rows of data, which can assist in training and testing the machine learning model.
+
+```{r}
+omit.adjustedR = adjusted.R.sq
+imputed.adjustedR = adjusted.R.sq2
+```
+"Omitted" Adjusted R^2
+```{r}
+omit.adjustedR
+```
+"Imputed" Adjusted R^2
+```{r}
+imputed.adjustedR
+```
 
 ## Questions? {data-background=border.jpg data-background-size=cover}
 

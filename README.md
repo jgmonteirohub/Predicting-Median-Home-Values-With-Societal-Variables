@@ -5,4 +5,5 @@
 * Analyzed 10+ predictor variables to order to ascertain which were the most important in predicting the city's median home values
 
 ![](https://github.com/jgmonteirohub/Predicting-Median-Home-Values-With-Societal-Variables/blob/master/medianbystate.PNG)
+
 Boxplots showing the distribution of median home values within the 5 states represented within the dataset
